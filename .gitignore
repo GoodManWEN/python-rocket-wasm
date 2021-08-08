@@ -1,5 +1,5 @@
 target
 .vscode
 .idea
-html/rocket.wasm
+# html/rocket.wasm
 __pycache__/
