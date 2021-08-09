@@ -53,15 +53,15 @@ def example():
 
 
     code = [
-        ('const', x_addr),
-        ('const', x_addr),
-        ('load', ),
-        ('const', v_addr),
-        ('load', ),
-        ('const', 0.1),
-        ('mul', ),
-        ('add', ),
-        ('store', ),
+        ('const', x_addr), # 22
+        ('const', x_addr), # 22,22
+        ('load', ),        # 22,22,L -> 22,2 
+        ('const', v_addr), # 22,2,42
+        ('load', ),        # 22,2,42,L -> 22,2,3
+        ('const', 0.1),    # 22,2,3,0.1
+        ('mul', ),         # 22,2,3,0.1,* -> 22,2,0.3
+        ('add', ),         # 22,2,0.3,+ -> 22,2.3
+        ('store', ),       # 22,2.3,S -> []
     ]
 
     m = Machine()

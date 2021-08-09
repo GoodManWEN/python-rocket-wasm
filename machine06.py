@@ -7,6 +7,13 @@ class Function:
         self.returns = returns
         self.code = code
 
+class ImportFunction:
+
+    def __init__(self, nparams, returns, call):
+        self.nparams = nparams
+        self.returns = returns
+        self.call = call
+
 class Machine:
 
     def __init__(self, functions, memsize=65536):
@@ -27,13 +34,16 @@ class Machine:
         return self.items.pop()
 
     def call(self, func, *args):
-        locals = dict(enumerate(args))  # { 0: args[0], 1: args[1], 2: args[2]}
-        try:
-            self.execute(func.code, locals)
-        except Return:
-            pass
-        if func.returns:
-            return self.pop()
+        locals = dict(enumerate(args))  # { 0: args[0], 1: args[1], 2: args[2] }
+        if isinstance(func, Function):
+            try:
+                self.execute(func.code, locals)
+            except Return:
+                pass
+            if func.returns:
+                return self.pop()
+        else:
+            return func.call(*args)  # External (improt function)
 
     def execute(self, instructions, locals):
         for op, *args in instructions:
@@ -56,10 +66,18 @@ class Machine:
                 right = self.pop()
                 left = self.pop()
                 self.push(left <= right)
+            elif op == 'lt':
+                right = self.pop()
+                left = self.pop()
+                self.push(left < right)
             elif op == 'ge':
                 right = self.pop()
                 left = self.pop()
                 self.push(left >= right)
+            elif op == 'gt':
+                right = self.pop()
+                left = self.pop()
+                self.push(left > right)
             elif op == 'load':
                 addr = self.pop()
                 self.push(self.load(addr))
@@ -93,7 +111,6 @@ class Machine:
                     if b.level > 0:
                         b.level -= 1
                         raise 
-
 
             # if (test) { consequence } else { alternative }
             # 
@@ -147,6 +164,14 @@ class Return(Exception):
 
 
 def example():
+
+    def py_display_player(x):
+        import time
+        print('\n(҂‾ ▵‾)︻デ═一' + ' ' * int(x) + '-')
+        time.sleep(0.02)
+
+    display_player = ImportFunction(nparams = 1, returns = None, call = py_display_player)
+
     # def update_position(x, v, dt):
     #     return x + v*dt
     # 
@@ -162,7 +187,7 @@ def example():
         ('add', ), 
     ])
 
-    functions = [update_position, ]
+    functions = [update_position, display_player]
     # Compute 2 + 3 * 0.1
     x_addr = 22
     v_addr = 42
@@ -177,34 +202,31 @@ def example():
     code = [
         ('block', [
                 ('loop', [
-                        ('const', x_addr),          # [22]
-                        ('load', ),                 # [22, L]  --->  [2]
-                        ('const', 0.0),             # [2, 0.0]
-                        ('le', ),                   # [False]
-                        ('br_if', 1),               #
+                        ('const', x_addr),
+                        ('load', ),
+                        ('call', 1),
+                        ('const', False),
+                        ('br_if', 1),
                         ('const', x_addr),
                         ('const', x_addr),
                         ('load', ),
                         ('const', v_addr),
                         ('load', ),
-                        ('const', 0.1),
+                        ('const', 0.02),
                         ('call', 0),
                         ('store', ),
                         ('block', [
                                 ('const', x_addr), 
                                 ('load', ),
-                                ('const', 70.0),
+                                ('const', 100.0),
                                 ('ge', ),
                                 ('block', [
                                         ('br_if', 0),
                                         ('br', 1),
                                     ]
                                 ),
-                                ('const', v_addr),
+                                ('const', x_addr),
                                 ('const', 0.0),
-                                ('const', v_addr),
-                                ('load', ),
-                                ('sub', ),
                                 ('store', ),
                             ]
                         ),
@@ -216,8 +238,8 @@ def example():
     ]
 
     m = Machine(functions)
-    m.store(x_addr, -2.0)
-    m.store(v_addr, 3.0)
+    m.store(x_addr, 0)
+    m.store(v_addr, 100)
     m.execute(code, None)
     print('Result', m.load(x_addr))
 

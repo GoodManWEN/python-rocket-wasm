@@ -3,3 +3,4 @@ target
 .idea
 html/rocket.wasm
 __pycache__/
+*.sh
