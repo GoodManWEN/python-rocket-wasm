@@ -3,20 +3,18 @@
 from numpy import (
     int32, int64, float32, float64
 )
-from numpy import (
-    int8, uint8, int16, uint16, uint32, uint64, frombuffer
-)
-import math
+
 import struct
 
+
 _const = {
-    'i32.const' : int32, 
-    'i64.const' : int64, 
+    'i32.const' : int32,
+    'i64.const' : int64,
     'f32.const' : float32,
     'f64.const' : float64,
 }
 
-_binary = {
+_binary = { 
     # 32-bit integer
     'i32.add'   : lambda x, y: int32(x + y),
     'i32.sub'   : lambda x, y: int32(x - y),
@@ -69,7 +67,7 @@ _binary = {
     'i64.shr_u' : lambda x, y: int64(int(uint64(x)) >> int(y)),
     'i64.shl'   : lambda x, y: int64(x << y),
 
-    # 64-bit float
+    # -- 64 bit float
     'f64.add'   : lambda x, y: float64(x + y),
     'f64.sub'   : lambda x, y: float64(x - y),
     'f64.mul'   : lambda x, y: float64(x * y),
@@ -82,18 +80,23 @@ _binary = {
     'f64.ge'    : lambda x, y: int32(x >= y),
 }
 
+import math
 _unary = {
     'i32.eqz' : lambda x: int32(x == 0),
     'i32.clz' : lambda x: int32(32 - len(bin(uint32(x))[2:])),
     'i32.ctz' : lambda x: int32(len(bin(uint32(x)).rsplit('1',1)[-1])),
     'i32.wrap_i64' : lambda x: int32(uint64(x)),
     'i64.extend_i32_u' : lambda x: int64(uint32(x)),
-    'f64.reinterpret_i64' : lambda x: frombuffer(x.tobytes(), float64)[0],
-    'f64.sqrt' : lambda x: float64(math.sqrt(x)),
+    'f64.reinterpret_i64': lambda x: frombuffer(x.tobytes(), float64)[0],
+    'f64.sqrt': lambda x: float64(math.sqrt(x)),
     'f64.convert_i32_u': lambda x: float64(uint32(x)),
 }
 
-_load = {
+from numpy import (
+     int8, uint8, int16, uint16, uint32, uint64, frombuffer,
+     )
+
+_load = { 
     'i32.load'     : lambda raw: frombuffer(raw, int32)[0],
     'i64.load'     : lambda raw: frombuffer(raw, int64)[0],
     'f64.load'     : lambda raw: frombuffer(raw, float64)[0],
@@ -120,37 +123,31 @@ _store = {
     'i64.store32' : lambda val: val.tobytes()[:4],
 }
 
-
 class Function:
-
     def __init__(self, nparams, returns, code):
         self.nparams = nparams
         self.returns = returns
         self.code = code
 
 class ImportFunction:
-
     def __init__(self, nparams, returns, call):
         self.nparams = nparams
         self.returns = returns
         self.call = call
 
 class Machine:
-
     def __init__(self, functions, memsize=65536):
-        self.functions = functions # function table
+        self.functions = functions  # function table
         self.items = []
         self.memory = bytearray(memsize)
-        self.globals = {0: float64(0.0)}
 
     def load(self, addr):
         return struct.unpack('<d', self.memory[addr:addr+8])[0]
-
+        
     def store(self, addr, val):
         self.memory[addr:addr+8] = struct.pack('<d', val)
 
     def push(self, item):
-        print(item)
         assert type(item) in { int32, int64, float32, float64 }
         self.items.append(item)
 
@@ -158,7 +155,7 @@ class Machine:
         return self.items.pop()
 
     def call(self, func, *args):
-        locals = dict(enumerate(args))  # { 0: args[0], 1: args[1], 2: args[2] }
+        locals = dict(enumerate(args))    # { 0: args[0], 1: args[1], 2: args[2] }
         if isinstance(func, Function):
             try:
                 self.execute(func.code, locals)
@@ -167,12 +164,11 @@ class Machine:
             if func.returns:
                 return self.pop()
         else:
-            return func.call(*args)  # External (improt function)
+            return func.call(*args)   # External (import function)
 
     def execute(self, instructions, locals):
-        # print('##################', instructions)
         for op, *args in instructions:
-            print(op, args, self.items)
+            # print(op, args, self.items)
             if op in _const:
                 self.push(_const[op](args[0]))
             elif op in _binary:
@@ -181,20 +177,25 @@ class Machine:
                 self.push(_binary[op](left, right))
             elif op in _unary:
                 self.push(_unary[op](self.pop()))
+
             elif op in _load:
-                addr = self.pop() + args[1]     # Offset
+                addr = self.pop() + args[1]   # Offset
                 self.push(_load[op](self.memory[addr:addr+8]))
+
             elif op in _store:
                 val = self.pop()
-                addr = self.pop() + args[1]     # Offset
+                addr = self.pop() + args[1] 
                 raw = _store[op](val)
                 self.memory[addr:addr+len(raw)] = raw
+
             elif op == 'memory.size':
                 self.push(int32(len(self.memory)//65536))
+
             elif op == 'memory.grow':
                 npages = self.pop()
-                self.memory.extend(bytes(npages * 65536))
+                self.memory.extend(bytes(npages*65536))
                 self.push(int32(len(self.memory)//65536))
+
             elif op == 'local.get':
                 self.push(locals[args[0]])
             elif op == 'local.set':
@@ -202,13 +203,9 @@ class Machine:
             elif op == 'local.tee':
                 locals[args[0]] = self.items[-1]
 
-            elif op == 'global.get':
-                self.push(self.globals[args[0]])
-            elif op == 'global.set':
-                self.globals[args[0]] = self.pop()
-
             elif op == 'drop':
                 self.pop()
+
             elif op == 'select':
                 c = self.pop()
                 v2 = self.pop()
@@ -222,167 +219,161 @@ class Machine:
                 if func.returns:
                     self.push(result)
 
-            # if (test) { consequence } else { alternative }
             elif op == 'br':
                 raise Break(args[0])
+
             elif op == 'br_if':
                 if self.pop():
                     raise Break(args[0])
-
-            # (br_table, [], default)
-            elif op == 'br_table': 
+            elif op == 'br_table':       # (br_tabel, [], default)
                 n = self.pop()
                 if n < len(args[0]):
                     raise Break(args[0][n])
                 else:
                     raise Break(args[1])
-
-            # ('block', type, [ instructions ])
-            elif op == 'block': 
-                print('###',op ,args,locals)
+            elif op == 'block':   # ('block', type, [ instructions ])
                 try:
                     self.execute(args[1], locals)
                 except Break as b:
                     if b.level > 0:
                         b.level -= 1
-                        raise 
-
-            # if (test) { consequence } else { alternative }
-            # 
+                        raise
+            # if (test) { consequence } else {alternative }
+            #
             # ('block', [
-            #         ('block', [
-            #                 test,
-            #                 ('br_if', 0),  # Goto 0
-            #                 alternative,
-            #                 ('br', 1),     # Goto 1
-            #             ]
-            #         ), # Label : 0
-            #         consequence,
-            #     ]
-            # ) # Label : 1
+            #             ('block', [
+            #                         test
+            #                         ('br_if, 0),  # Goto 0
+            #                         alternative,
+            #                         ('br', 1),    # Goto 1
+            #                       ]
+            #             ),  # Label : 0 
+            #             consequence,
+            #           ]
+            # ) # Label 1: 
 
             elif op == 'loop':
                 while True:
                     try:
                         self.execute(args[1], locals)
-                        break 
+                        break
                     except Break as b:
                         if b.level > 0:
                             b.level -= 1
-                            raise 
+                            raise
 
             # while (test) { body }
             # ('block', [
-            #         ('loop', [    # Label 0
-            #                 not test
-            #                 ('br_if', 1),   # Goto 1: (break)
-            #                 body
-            #                 ('br', 0),      # Goto 0: (continue)
-            #             ]
-            #         )
-            #     ]
-            # )   # Label 1
+            #            ('loop', [     # Label 0
+            #                      not test
+            #                      ('br_if', 1), # Goto 1:  (break)
+            #                      body
+            #                      ('br', 0),    # Goto 0:  (continue)
+            #                      ]
+            #            )
+            #           ]
+            # ) # label 1
 
             elif op == 'return':
                 raise Return()
 
             else:
+                print(op, args, locals)
+                print(self.memory[1056640-8:1056640+8])
+                print(self.functions)
                 raise RuntimeError(f'Bad op {op}')
 
 class Break(Exception):
-
     def __init__(self, level):
         self.level = level
 
 class Return(Exception):
     pass
 
-
 def example():
-
     def py_display_player(x):
         import time
-        print(' ' * int(x) + '<0:>')
+        print(' '*int(x) + '<O:>')
         time.sleep(0.02)
 
-    display_player = ImportFunction(nparams = 1, returns = None, call = py_display_player)
+    display_player = ImportFunction(nparams=1, returns=None, call=py_display_player)
 
     # def update_position(x, v, dt):
     #     return x + v*dt
-    # 
-    # x = 2
-    # v = 3
-    # x = x + v * 0.1
-
-    update_position = Function(nparams = 3, returns = True, code = [
-        ('local.get', 0), # x
-        ('local.get', 1), # v
-        ('local.get', 2), # dt
-        ('mul', ), 
-        ('add', ), 
-    ])
+    #
+    update_position = Function(nparams=3, returns=True, code=[
+            ('local.get', 0),  # x
+            ('local.get', 1),  # v
+            ('local.get', 2),  # dt
+            ('mul',),
+            ('add',)
+            ])
 
     functions = [update_position, display_player]
-    # Compute 2 + 3 * 0.1
+
+    # x = 2
+    # v = 3
+    # x = x + v*0.1
     x_addr = 22
     v_addr = 42
-
-    # while x > 0 {
-    #     x = update_position(x, v, 0.1)
-    #     if x >= 70 {
-    #         v = -v;
-    #     }
-    # }
-
-    code = [
-        ('block', [
-                ('loop', [
-                        ('const', x_addr),
-                        ('load', ),
-                        ('call', 1),
-                        ('const', x_addr),
-                        ('load', ),
-                        ('const', 0.0),
-                        ('le', ),
-                        ('br_if', 1),
-                        ('const', x_addr),
-                        ('const', x_addr),
-                        ('load', ),
-                        ('const', v_addr),
-                        ('load', ),
-                        ('const', 0.1),
-                        ('call', 0),
-                        ('store', ),
-                        ('block', [
-                                ('const', x_addr), 
-                                ('load', ),
-                                ('const', 70.0),
-                                ('ge', ),
-                                ('block', [
-                                        ('br_if', 0),
-                                        ('br', 1),
-                                    ]
-                                ),
-                                ('const', v_addr),
-                                ('const', 0.0),
-                                ('const', v_addr),
-                                ('load', ),
-                                ('sub', ),
-                                ('store', ),
-                            ]
-                        ),
-                        ('br', 0),
-                    ]
-                )
-            ]
-        )
-    ]
 
     m = Machine(functions)
     m.store(x_addr, 2.0)
     m.store(v_addr, 3.0)
-    m.execute(code, None)
-    print('Result', m.load(x_addr))
+
+    # while x > 0 {
+    #    x = update_position(x, v, 0.1)
+    #    if x >= 70 {
+    #        v = -v;
+    #    }
+    # }
+    m.execute([
+            ('block', [
+                    ('loop', [
+                            ('const', x_addr),
+                            ('load',),
+                            ('call', 1),
+                            ('const', x_addr),
+                            ('load',),
+                            ('const', 0.0),
+                            ('le',),
+                            ('br_if', 1),
+                            ('const', x_addr),
+                            ('const', x_addr),
+                            ('load',),
+                            ('const', v_addr),
+                            ('load',),
+                            ('const', 0.1),
+                            ('call', 0),
+                            ('store',),
+                            ('block', [
+                                    ('const', x_addr),
+                                    ('load',),
+                                    ('const', 70.0),
+                                    ('ge',),
+                                    ('block', [
+                                            ('br_if', 0),
+                                            ('br', 1),
+                                            ]
+                                     ),
+                                    ('const', v_addr),
+                                    ('const', 0.0),
+                                    ('const', v_addr),
+                                    ('load',),
+                                    ('sub',),
+                                    ('store',)
+                                    ]
+                             ),
+                            ('br', 0),
+                            ]
+                     )
+                    ]
+             )
+
+            ], None)
+
+    print('Result:', m.load(x_addr))
+
 
 if __name__ == '__main__':
     example()
