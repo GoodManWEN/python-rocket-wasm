@@ -111,18 +111,6 @@ width = float64(800.0)
 height = float64(600.0)
 
 m.call(exports['resize'], width, height)    # Prayer
-# print(len(m.memory)) # 1310720
-# 1056640
-# print()
-
-# import re
-# from pipeit import *
-# for _ in module['code']:
-#     ss = re.findall("'[a-zA-Z0-9]+?.[a-zA-Z0-9]+?'", str(wadze.parse_code(_))) | Map(lambda x:x[1:-1]) | list
-#     for j in ss:
-#         if j  not in ddd:
-#             print(j)
-# print(ddd)
 
 # Game loop
 import time
